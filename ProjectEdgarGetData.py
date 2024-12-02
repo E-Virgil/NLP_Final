@@ -5,44 +5,80 @@ import yfinance as yf
 import time
 import os
 
+#  https://pypi.org/project/edgartools/3.0.1/
+
+def adjust_to_next_business_day(date_str):
+    '''
+    Adjust a given date string to the next business day if it falls on a weekend or non-trading day.
+    :param date_str: A date string in the format 'YYYY-MM-DD'
+    :return: A string representing the next business day
+    '''
+    # Convert the string to a pandas Timestamp
+    date = pd.Timestamp(date_str)
+
+    # If it's already a business day, return as is
+    if date.weekday() < 5:  # Monday to Friday are 0-4
+        return date.strftime('%Y-%m-%d')
+
+    # If it's a weekend, adjust to the next business day
+    next_business_day = pd.bdate_range(start=date, periods=1)[0]
+    return next_business_day.strftime('%Y-%m-%d')
+
 def get_assets(tickers: list, start_year: int):
     '''
     This function takes a list of ticker symbols and retrieves the asset values for the given timeframe from SEC EDGAR
-    database using the edgartools module.  It saves as a csv file locally and returns the data frame and a list
+    database using the edgartools module.  It saves as a csv file locally and returns the data frame and a dictionary
     of related filing dates.
     :param tickers: list of strings of stock ticker identifiers
     :param start_year: year to begin grabbing filings
-    :return: data frame of assets with dates organized including tickers as well as the list of related filing dates
+    :return: data frame of assets with dates organized including tickers as well as a dictionary of related filing dates
     for each ticker
     '''
+    # Initialize an empty dictionary to store dates by ticker
+    ticker_filed_dates = {}
+
     # Initialize an empty list to store DataFrames
     all_data = []
+
     # Loop through each ticker
     for ticker in tqdm(tickers, desc="Grabbing each ticker's assets..."):
         try:
             # Initialize the Company instance
             company = Company(ticker)
 
-            # Retrieve all 10-Q filings since 2009
-            filings = company.get_filings(form="10-Q").filter(date=f"{start_year}-01-01:")
+            # Retrieve all 10-Q and 10-K filings since start_year
+            filings_q = company.get_filings(form="10-Q").filter(date=f"{start_year}-01-01:")
+            filings_k = company.get_filings(form="10-K").filter(date=f"{start_year}-01-01:")
 
             # Convert filings to a DataFrame and filter for 'Assets' fact
-            df = company.get_facts().to_pandas()
-            assets_df = df.query("fact == 'Assets' and form == '10-Q'")
+            df_q = company.get_facts().to_pandas()
+            df_k = company.get_facts().to_pandas()
+            df_q = df_q[df_q['filed'] >= f"{start_year}-01-01"].copy()
+            df_k = df_k[df_k['filed'] >= f"{start_year}-01-01"].copy()
+            df_q = df_q.query("fact == 'Assets' and form == '10-Q'").copy()
+            df_k = df_k.query("fact == 'Assets' and form == '10-K'").copy()
 
-            # Drop duplicates and keep the first instance for each reporting period
-            filtered_df = assets_df.drop_duplicates(subset='end', keep='first')
-            filtered_df = filtered_df.iloc[:, :8]
+            # Combine 10-Q and 10-K DataFrames
+            combined_df = pd.concat([df_q, df_k])
+
+            # Ensure 'filed' and 'end' columns are datetime
+            combined_df['filed'] = pd.to_datetime(combined_df['filed']).copy()
+            combined_df['end'] = pd.to_datetime(combined_df['end']).copy()
+
+            # Sort by end date and then by filed date
+            combined_df = combined_df.sort_values(by=['end', 'filed']).copy()
+
+            # Deduplicate to keep only the first instance per end date
+            filtered_df = combined_df.drop_duplicates(subset='end', keep='first').copy()
 
             # Add the ticker symbol to the DataFrame
-            filtered_df["Ticker"] = ticker
-
-            # Convert 'end' column to datetime and set as the index
-            filtered_df['end'] = pd.to_datetime(filtered_df['end'])
-            filtered_df.set_index('end', inplace=True)
+            filtered_df.loc[:,"Ticker"] = ticker
 
             # Append the filtered data to the all_data list
             all_data.append(filtered_df)
+
+            # Store unique filed dates for this ticker
+            ticker_filed_dates[ticker] = sorted(set(filtered_df['filed'].dt.strftime('%Y-%m-%d')))
 
         except Exception as e:
             print(f"An error occurred for ticker {ticker}: {e}")
@@ -53,33 +89,30 @@ def get_assets(tickers: list, start_year: int):
     # Save the final DataFrame to a CSV file
     final_df.to_csv("assets_data.csv")
 
-    # Extract the 'end' dates as a set and sort list
-    end_dates_list = sorted(set(final_df.index.strftime('%Y-%m-%d')))
+    return final_df, ticker_filed_dates
 
-    return final_df, end_dates_list
-
-def get_prices(ordered_end_dates: list, tickers: list):
+def get_prices(ticker_filed_dates: dict):
     '''
     This function gets the prices from yahoo finance using yfinance module for comparative purposes to the assets from
     SEC EDGAR database.  It saves as a csv file locally and returns the data frame.
-    :param ordered_end_dates: these are the ordered dates from the SEC filings for comparison as a list of strings
-    :param tickers: list of strings of stock ticker identifiers
-    :return: data frame of prices with dates organized including tickers
+    :param ticker_filed_dates: dictionary of related stock tickers and 10-Q filing dates
+    :return: data frame of prices and period returns with dates organized including tickers
     '''
-    # Convert ordered_end_dates to datetime and format as strings (date-only)
-    ordered_end_dates = pd.to_datetime(ordered_end_dates).strftime('%Y-%m-%d')
-
-    # Get the minimum and maximum dates from the ordered list
-    min_date = ordered_end_dates.min()
-    max_date = ordered_end_dates.max()
 
     # Initialize an empty list to store DataFrame rows
     data_rows = []
 
-    # Loop through each ticker
-    for ticker in tqdm(tickers, desc="Grabbing each ticker's prices..."):
+    # Loop through each ticker and its associated filed dates
+    for ticker, dates in tqdm(ticker_filed_dates.items(), desc="Grabbing each ticker's prices..."):
         try:
-            # Fetch data for the full date range
+            # Adjust all dates to the next business day
+            adjusted_dates = [adjust_to_next_business_day(date) for date in dates]
+
+            # Determine the min and max dates for this ticker
+            min_date = min(adjusted_dates)
+            max_date = (pd.Timestamp(max(adjusted_dates)) + pd.Timedelta(days=1)).strftime('%Y-%m-%d')  # Extend by 1 day
+
+            # Fetch data for the date range of this ticker
             data = yf.download(ticker, start=min_date, end=max_date, group_by="ticker", progress=False)
 
             # Check if data is not empty
@@ -91,8 +124,8 @@ def get_prices(ordered_end_dates: list, tickers: list):
                 # Convert data index to date-only strings
                 data.index = data.index.strftime('%Y-%m-%d')
 
-                # Filter the data to include only the specified dates in ordered_end_dates
-                filtered_data = data[data.index.isin(ordered_end_dates)]
+                # Filter the data to include only the adjusted filed dates for this ticker
+                filtered_data = data[data.index.isin(adjusted_dates)]
 
                 # Extract the adjusted close price for each date in filtered_data
                 for date in filtered_data.index:
@@ -110,6 +143,12 @@ def get_prices(ordered_end_dates: list, tickers: list):
 
     # Convert the list of rows into a DataFrame
     extended_df = pd.DataFrame(data_rows)
+
+    # Calculate interperiod returns grouped by ticker
+    extended_df['Interperiod Return Pct'] = (
+        extended_df.groupby('Ticker')['Adj Close']
+        .pct_change()  # Compute percentage change
+    )
 
     # Save the final DataFrame to a CSV file
     extended_df.to_csv("final_prices.csv", index=False)
@@ -188,16 +227,13 @@ def main():
                "INTC", "DOW", "GE", "T", "HPQ", "BAC", "AA", "XOM", "PFE", "RTX"]
 
     # Define start year for grabbing filings and prices
-    start_year = 2023
+    start_year = 2016
 
-    # Get assets and filing dates since beginning 2009
-    final_assets, end_dates_list = get_assets(tickers, start_year)
-
-    # Extract the 'end' dates as a set and sort list
-    ordered_end_dates = sorted(set(final_assets.index.strftime('%Y-%m-%d')))
+    # Get assets and filing dates since beginning start_year
+    final_assets, ticker_dates = get_assets(tickers, start_year)
 
     # Get prices from yahoo finance for filing dates
-    final_prices = get_prices(ordered_end_dates, tickers)
+    final_prices = get_prices(ticker_dates)
 
     # Get 10-Q MD&A text
     get_mda_as_txt(tickers, start_year)
