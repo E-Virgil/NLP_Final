@@ -51,7 +51,7 @@ def load_documents(directory):
     return documents, tickers, filenames
 
 
-def main():
+def get_sentiment_analysis():
     # Load your documents from a directory
     documents, tickers, filenames = load_documents("mda_texts")
     # Create TF-IDF vectorizer
@@ -67,7 +67,7 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained("ProsusAI/finbert")
     model = AutoModelForSequenceClassification.from_pretrained("ProsusAI/finbert")
 
-    # Get sentiment for each headline
+    # Get sentiment for each document
     sentiments = []
     for text in documents:
         sentiment = get_sentiment(text, tokenizer, model)
@@ -85,4 +85,4 @@ def main():
     df.to_csv('sentiment_analysis.csv')
 
 if __name__ == "__main__":
-    main()
+    get_sentiment_analysis()
