@@ -1,15 +1,17 @@
+import os
+import shutil
+
 import streamlit as st
 from dotenv import load_dotenv
-import os
-from ProjectEdgarGetData import get_mda_as_txt  # Import the required function
+from edgar import set_identity
+from langchain.chains import ConversationalRetrievalChain
+from langchain.memory import ConversationBufferMemory
 from langchain.text_splitter import CharacterTextSplitter
+from langchain_community.chat_models import ChatOpenAI
 from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
-from langchain_community.chat_models import ChatOpenAI
-from langchain.memory import ConversationBufferMemory
-from langchain.chains import ConversationalRetrievalChain
-import shutil
-from edgar import set_identity
+from ProjectEdgarGetData import get_mda_as_txt  # Import the required function
+from sentiment_analysis import get_sentiment_analysis
 
 # Set identity for EDGAR
 set_identity("Shrey Desai desai.shrey@northeastern.edu")
@@ -86,7 +88,7 @@ if selected_ticker != st.session_state.previous_ticker:
 if st.button("Fetch MD&A and Start Chatbot"):
     st.write(f"Fetching MD&A text for {selected_ticker} for the last 3 years...")
     start_year = 2021  # Fetch data for the last 3 years
-    
+
     try:
         # Fetch MD&A text
         get_mda_as_txt([selected_ticker], start_year, output_folder=output_folder)
@@ -96,10 +98,18 @@ if st.button("Fetch MD&A and Start Chatbot"):
         st.write("Storing documents in the vector store...")
         store_documents_in_vector_store(output_folder, vector_store_folder)
         st.success("Documents stored successfully!")
-        
+
+        sent_score = get_sentiment_analysis(selected_ticker)
+        sent_score['Numeric'] = sent_score.apply(lambda row: 2.0 if row["Sentiment"] == 'Positive' else 1.0 if row["Sentiment"] == "Neutral" else 0.0, axis=1)
+
+        sent_percent = sent_score['Numeric'].sum()/(2.0 * len(sent_score)) * 100
+
+        sentiment_button = st.button(f"Sentiment score for {selected_ticker}: {sent_percent:.2f}% {'POSITIVE' if sent_percent > 60 else 'NEUTRAL' if sent_percent > 40 else 'NEGATIVE'}")
+
         # Initialize conversation chain
         st.write("Initializing chatbot...")
         st.session_state.conversation = get_conversation_chain(vector_store_folder)
+
         st.success("Chatbot is ready! You can start chatting.")
     except Exception as e:
         st.error(f"An error occurred: {e}")
