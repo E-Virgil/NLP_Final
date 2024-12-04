@@ -1,6 +1,5 @@
 import os
 import shutil
-
 import streamlit as st
 from dotenv import load_dotenv
 from edgar import set_identity
@@ -8,7 +7,7 @@ from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.chat_models import ChatOpenAI
-from langchain_community.embeddings import OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from ProjectEdgarGetData import get_mda_as_txt  # Import the required function
 from sentiment_analysis import get_sentiment_analysis
@@ -48,7 +47,7 @@ def store_documents_in_vector_store(folder_path, vector_store_folder):
     all_texts = []
     for file_name in os.listdir(folder_path):
         if file_name.endswith(".txt"):
-            with open(os.path.join(folder_path, file_name), "r", encoding="utf-8") as file:
+            with open(os.path.join(folder_path, file_name), "r", encoding="utf-8", errors="ignore") as file:
                 text = file.read()
                 texts = text_splitter.split_text(text)
                 all_texts.extend(texts)
