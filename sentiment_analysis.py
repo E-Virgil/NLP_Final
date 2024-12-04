@@ -51,7 +51,7 @@ def load_documents(directory):
     return documents, tickers, filenames
 
 
-def get_sentiment_analysis():
+def get_sentiment_analysis(ticker):
     # Load your documents from a directory
     documents, tickers, filenames = load_documents("mda_texts")
     # Create TF-IDF vectorizer
@@ -71,7 +71,6 @@ def get_sentiment_analysis():
     sentiments = []
     for text in documents:
         sentiment = get_sentiment(text, tokenizer, model)
-        print(sentiment)
         if sentiment == 0:
             sentiments.append("Negative")
         elif sentiment == 1:
@@ -81,8 +80,9 @@ def get_sentiment_analysis():
 
     # Combine results
     df = pd.DataFrame({"Stock": tickers, "Filename": filenames, "Text": documents, "Sentiment": sentiments})
-    print(df)
-    df.to_csv('sentiment_analysis.csv')
+
+    return df.loc[df['Stock'] == ticker, ['Stock', 'Sentiment']]
+
 
 if __name__ == "__main__":
     get_sentiment_analysis()
