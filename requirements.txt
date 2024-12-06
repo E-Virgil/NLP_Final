@@ -9,7 +9,7 @@ langchain==0.3
 langchain_community
 langchain-openai
 faiss-cpu==1.7.4
-openai==0.28.1
+openai==1.56.2
 shutilwhich==1.1.0
 edgartools==3.0.1
 tqdm>=4.60.0
