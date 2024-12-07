@@ -36,7 +36,7 @@ From here you can select one of the 40 tickers for the constituents of the Dow J
 To perform data retrieval only to view the price history and returns of provided tickers...
 
 ### Sentiment Analysis
-To perform sentiment analysis over the loaded data only without chat...
+This program uses finBERT in order to process the sentiment analysis of loaded financial documents. When a ticker is selected and the data is pulled from the EDGAR API, the files associated with that stock are saved in the `mda_texts` directory. The sentiment analysis code iteratively loads and processes each file, using the model to assign it a score of 2 points for positive sentiment, 1 point for neutral sentiment, and 0 points for a negative sentiment. Then, an average is computed among all documents listed under that report, and converted into a percentage.
 
 ## Program
 The program runs on a series of helper functions that gather SEC Edgar filings, price history from yahoo finance, sentiment analysis for the documents retrieved and then uses OpenAI to run a chatbot over top of the data we have gathered and fed to the system.  The program utilizes an interface from streamlit for web browser graphical user interface which provides some options for how to run the application.
