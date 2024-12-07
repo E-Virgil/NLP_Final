@@ -1,5 +1,6 @@
 import os
 import re
+
 import nltk
 import pandas as pd
 import torch
@@ -42,10 +43,15 @@ def load_documents(directory):
     filenames = []
     for filename in os.listdir(directory):
         if filename.endswith(".txt"):
-            with open(os.path.join(directory, filename), "r") as f:
+            with open(
+                os.path.join(directory, filename),
+                "r",
+                encoding="utf-8",
+                errors="ignore",
+            ) as f:
                 text = f.read()
                 documents.append(preprocess_text(text))
-                tickers.append(filename[:filename.find("_")])
+                tickers.append(filename[: filename.find("_")])
                 filenames.append(filename)
     return documents, tickers, filenames
 
@@ -78,9 +84,16 @@ def get_sentiment_analysis(ticker):
             sentiments.append("Positive")
 
     # Combine results
-    df = pd.DataFrame({"Stock": tickers, "Filename": filenames, "Text": documents, "Sentiment": sentiments})
+    df = pd.DataFrame(
+        {
+            "Stock": tickers,
+            "Filename": filenames,
+            "Text": documents,
+            "Sentiment": sentiments,
+        }
+    )
 
-    return df.loc[df['Stock'] == ticker, ['Stock', 'Sentiment']]
+    return df.loc[df["Stock"] == ticker, ["Stock", "Sentiment"]]
 
 
 if __name__ == "__main__":
