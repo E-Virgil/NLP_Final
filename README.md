@@ -1,4 +1,6 @@
 # Financial Narratives: Sentiment Analysis of SEC Filings
+## Project Video
+[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/Gu2TTEBP81s/0.jpg)](https://www.youtube.com/watch?v=Gu2TTEBP81s)
 ## Abstract
 The goal of this project was to analyze sentiment in financial data using Natural Language Processing (NLP) techniques,
 focusing on U.S. Securities and Exchange Commission (SEC) filings via the Edgar database. Data is extracted from 10-Q
