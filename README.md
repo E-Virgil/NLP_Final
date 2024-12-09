@@ -17,6 +17,8 @@ pip install -r requirements.txt
 
 An OpenAI user **must** obtain environment credentials to save locally in a .env file in the project folder to run the program.  This user key allows the chatbot to access the OpenAI architecture for the chatbot functionality.
 
+***Important for graders: The environment credentials were submitted to canvas as a file named `RENAMETO<.csv>`. RENAME THAT FILE TO .env AND PLACE IN THE PROJECT FOLDER***
+
 ## Usage
 ### Chatbot
 
