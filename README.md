@@ -35,7 +35,11 @@ From here you can select one of the 40 tickers for the constituents of the Dow J
 ![App Screenshot](images/app2.png)
 
 ### Data Retrieval
-To perform data retrieval only to view the price history and returns of provided tickers...
+To perform data retrieval only to view the price history and returns of provided tickers run the below script and adjust the start date or ticker list to your liking.
+```
+python ProjectEdgarGetData.py
+```
+The base code creates an archive going back to 2016 for the 40 current and legacy DJIA constituents.  It will use the edgartools package to locate 'item 2' from the loaded 10-Q using ```get_mda_as_txt()``` and save the text string as a .txt, looping through each ticker for the selected period of time.  This is a time-consuming endeavor as the text strings are very long so prepare to wait 20 minutes or more if loading more than 4 years of data.  To get the price and asset data you will need to run ```get_assets()``` to obtain the filing dates for the period and then ```get_prices()``` to access yahoo finance's historical prices for the filing dates and calculate the lagged returns over the period.  This is a mandatory step to run the sentiment analysis below.
 
 ### Sentiment Analysis
 This program uses finBERT in order to process the sentiment analysis of loaded financial documents. When a ticker is selected and the data is pulled from the EDGAR API, the files associated with that stock are saved in the `mda_texts` directory. The sentiment analysis code iteratively loads and processes each file, using the model to assign it a score of 2 points for positive sentiment, 1 point for neutral sentiment, and 0 points for a negative sentiment. Then, an average is computed among all documents listed under that report, and converted into a percentage.
